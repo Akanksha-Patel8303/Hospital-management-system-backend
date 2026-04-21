@@ -78,16 +78,20 @@ function auth(req, res, next) {
 }
 
 // ================= REGISTER =================
-app.post("/register", async (req, res) => {
+app.post("/signup", async (req, res) => {
   const { email, password } = req.body;
-  const hash = await bcrypt.hash(password, 10);
 
-  await pool.query(
-    "INSERT INTO users(email,password) VALUES($1,$2)",
-    [email, hash]
-  );
+  try {
+    await pool.query(
+      "INSERT INTO users(email, password) VALUES($1, $2)",
+      [email, password]
+    );
 
-  res.json({ message: "User Registered" });
+    res.json({ message: "Signup successful" });
+
+  } catch (err) {
+    res.status(400).json({ error: "User already exists" });
+  }
 });
 
 // ================= LOGIN =================
