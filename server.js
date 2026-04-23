@@ -31,6 +31,8 @@ async function initDB() {
       role TEXT DEFAULT 'patient'
     );
 
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'patient';
+
     CREATE TABLE IF NOT EXISTS patients(
       id SERIAL PRIMARY KEY,
       name TEXT,
@@ -74,6 +76,8 @@ async function initDB() {
       token INT,
       date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+
   `);
 }
 initDB();
@@ -99,16 +103,14 @@ app.post("/signup", async (req, res) => {
   try {
     await pool.query(
       "INSERT INTO users(email,password,role) VALUES($1,$2,$3)",
-      [email, hash, role || "patient"]
+      [email, hash, role || "patient"] // default patient
     );
 
     res.json({ message: "Signup success" });
-
   } catch {
     res.status(400).json({ message: "User already exists" });
   }
 });
-
 // ================= LOGIN =================
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
@@ -118,24 +120,25 @@ app.post("/login", async (req, res) => {
     [email]
   );
 
-  if (!user.rows.length) return res.send("User not found");
+  if (!user.rows.length) {
+    return res.json({ message: "User not found" });
+  }
 
   const valid = await bcrypt.compare(password, user.rows[0].password);
-  if (!valid) return res.send("Wrong password");
-
-  const u = user.rows[0];
+  if (!valid) {
+    return res.json({ message: "Wrong password" });
+  }
 
   const token = jwt.sign(
-    { id: u.id, role: u.role },
+    { id: user.rows[0].id, role: user.rows[0].role },
     "secret"
   );
 
   res.json({
     token,
-    role: u.role
+    role: user.rows[0].role   // 👈 VERY IMPORTANT
   });
 });
-
 // ================= DASHBOARD =================
 app.get("/dashboard", auth, async (req, res) => {
   const p = await pool.query("SELECT COUNT(*) FROM patients");
@@ -276,5 +279,5 @@ app.get("/report", auth, (req, res) => {
 });
 
 // ================= SERVER =================
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log("Server running on port", PORT));
